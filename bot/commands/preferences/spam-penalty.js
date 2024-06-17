@@ -20,12 +20,12 @@ module.exports = {
 
 		const penalty = interaction.options.getNumber('penalty');
 
-		const guild = await Guild.findOne({
+		const guildData = await Guild.findOne({
 			where: { guildId: interaction.guild.id },
 		});
 
-		if (guild) {
-			await guild.update({ spamPenalty: penalty });
+		if (guildData) {
+			await guildData.update({ spamPenalty: penalty });
 			await interaction.editReply(
 				`Successfully set spam penalty for **${interaction.guild.name}** to **${penalty}** second(s)!`
 			);

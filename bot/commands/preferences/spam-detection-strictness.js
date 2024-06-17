@@ -20,12 +20,12 @@ module.exports = {
 
 		const strictness = interaction.options.getNumber('strictness');
 
-		const guild = await Guild.findOne({
+		const guildData = await Guild.findOne({
 			where: { guildId: interaction.guild.id },
 		});
 
-		if (guild) {
-			await guild.update({ spamDetectionStrictness: strictness });
+		if (guildData) {
+			await guildData.update({ spamDetectionStrictness: strictness });
 			await interaction.editReply(
 				`Successfully set spam detection strictness for **${interaction.guild.name}** to **${strictness}**!`
 			);

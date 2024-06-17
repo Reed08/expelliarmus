@@ -39,15 +39,16 @@ module.exports = {
 
 		collector.on('collect', async (i) => {
 			if (i.customId === 'yes') {
-				const guild = await Guild.findOne({
+				const guildData = await Guild.findOne({
 					where: { guildId: interaction.guild.id },
 				});
 
 				if (
-					guild &&
-					(guild.spamDetectionStrictness !== 1000 || guild.spamPenalty !== 60)
+					guildData &&
+					(guildData.spamDetectionStrictness !== 1000 ||
+						guildData.spamPenalty !== 60)
 				) {
-					await guild.update({
+					await guildData.update({
 						spamDetectionStrictness: 1000,
 						spamPenalty: 60,
 					});
