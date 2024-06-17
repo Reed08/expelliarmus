@@ -1,10 +1,10 @@
 {
 	"name": "expelliarmus",
 	"version": "1.0.0",
-	"main": "src/index.js",
+	"main": "bot/index.js",
 	"scripts": {
-		"dev": "nodemon src/index.js",
-		"deploy": "node src/deploy-commands.js"
+		"dev": "nodemon .",
+		"deploy": "node bot/deploy-commands.js"
 	},
 	"keywords": [],
 	"author": "",
@@ -12,7 +12,9 @@
 	"description": "",
 	"dependencies": {
 		"discord.js": "^14.15.3",
-		"dotenv": "^16.4.5"
+		"dotenv": "^16.4.5",
+		"sequelize": "^6.37.3",
+		"sqlite3": "^5.1.7"
 	},
 	"devDependencies": {
 		"nodemon": "^3.1.3"
