@@ -2,6 +2,7 @@ const {
 	SlashCommandBuilder,
 	ActionRowBuilder,
 	ButtonBuilder,
+	PermissionFlagsBits,
 } = require('discord.js');
 const Guild = require('../../../db/models/guild.js');
 
@@ -9,7 +10,8 @@ module.exports = {
 	cooldown: 5,
 	data: new SlashCommandBuilder()
 		.setName('reset-preferences')
-		.setDescription('Resets the preferences for this guild to default values.'),
+		.setDescription('Resets the preferences for this guild to default values.')
+		.setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers),
 	async execute(interaction) {
 		const confirmation = await interaction.reply({
 			content: 'Are you sure you want to reset preferences for this guild?',
@@ -40,8 +42,6 @@ module.exports = {
 				const guild = await Guild.findOne({
 					where: { guildId: interaction.guild.id },
 				});
-
-				console.log(guild.spamDetectionStrictness);
 
 				if (
 					guild &&
