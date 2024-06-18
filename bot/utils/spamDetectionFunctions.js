@@ -6,11 +6,8 @@ async function handleSpamDetection(message) {
 			where: { guildId: message.guild.id },
 		});
 
-		if (guildData == null) {
-			guildData = await Guild.create({
-				guildId: message.guild.id,
-			});
-		}
+		guildData =
+			guildData || (await Guild.create({ guildId: message.guild.id }));
 
 		await addMessageToPreviousMessages(guildData, message.author.id, message);
 		await removeOldMessages(guildData, message.author.id);
@@ -20,20 +17,15 @@ async function handleSpamDetection(message) {
 			await timeoutUser(guildData, message);
 		}
 	} catch (err) {
-		console.log(`Error in spam detection: ${err}`);
+		console.log(`Error handling spam detection: ${err}`);
 	}
 }
 
 async function addMessageToPreviousMessages(guildData, userId, message) {
-	if (guildData.previousMessages === null) {
-		guildData.previousMessages = {};
-	}
+	guildData.previousMessages = guildData.previousMessages || {};
+	guildData.previousMessages[userId] = guildData.previousMessages[userId] || [];
 
-	if (guildData.previousMessages[userId] == null) {
-		guildData.previousMessages[userId] = [message];
-	} else {
-		guildData.previousMessages[userId].push(message);
-	}
+	guildData.previousMessages[userId].push(message);
 
 	guildData.changed('previousMessages', true);
 	await guildData.save();
@@ -56,36 +48,35 @@ async function calculateSpamScore(guildData, userId) {
 	const now = Date.now();
 	let spamScore = 0;
 
-	const encodings = [];
 	const messages = guildData.previousMessages[userId];
 
-	messages.forEach((message) => {
+	const encodings = messages.flatMap((message) => {
 		const messageEncodings = encode(message.content);
-		encodings.push(...messageEncodings);
 		spamScore +=
 			(message.content.length + 100 * message.content.split('\n').length) *
 			Math.pow(0.95, (now - message.createdTimestamp) / 1000);
+		return messageEncodings;
 	});
 
-	const uniqueTokens = [];
-	encodings.forEach((encoding) => {
-		if (!uniqueTokens.includes(encoding)) {
-			uniqueTokens.push(encoding);
-		}
-	});
+	const uniqueTokens = new Set(encodings);
 
 	let messageSimilarityMultiplier;
-	if (uniqueTokens.length === 0) {
+	if (uniqueTokens.size === 0) {
 		messageSimilarityMultiplier = 1;
 	} else {
 		messageSimilarityMultiplier =
-			2 - 2 * (uniqueTokens.length / encodings.length);
+			2 - 2 * (uniqueTokens.size / encodings.length);
 	}
 
 	return spamScore * Math.min(Math.max(messageSimilarityMultiplier, 0.8), 2);
 }
 
 async function timeoutUser(guildData, message) {
+	const previousMessages = guildData.previousMessages[message.author.id];
+	guildData.previousMessages[message.author.id] = [];
+	guildData.changed('previousMessages', true);
+	await guildData.save();
+
 	if (guildData.previousTimeouts === null) {
 		guildData.previousTimeouts = {};
 	}
@@ -94,18 +85,7 @@ async function timeoutUser(guildData, message) {
 		guildData.previousTimeouts[message.author.id] = 0;
 	}
 
-	if (!message.member.moderatable)
-		return message.channel.send(
-			`<@531286082831253515>, <@${message.author.id}> must be timed out for **${
-				guildData.spamPenalty
-			}** seconds for spamming. **${
-				guildData.previousMessages[message.author.id].length
-			}** spam message(s) were detected. <@${
-				message.author.id
-			}> has previously been timed out for spamming **${
-				guildData.previousTimeouts[message.author.id]
-			}** time(s) in this server.`
-		);
+	if (!message.member.moderatable) return;
 
 	await message.member.timeout(guildData.spamPenalty * 1000);
 	guildData.previousTimeouts[message.author.id] += 1;
@@ -113,7 +93,11 @@ async function timeoutUser(guildData, message) {
 	guildData.changed('previousTimeouts', true);
 	await guildData.save();
 
-	const numMessagesDeleted = await deleteMessages(guildData, message.author.id);
+	const numMessagesDeleted = await deleteMessages(
+		guildData,
+		message,
+		previousMessages
+	);
 
 	message.channel.send(
 		`Timed out <@${message.author.id}> for **${
@@ -126,22 +110,29 @@ async function timeoutUser(guildData, message) {
 	);
 }
 
-async function deleteMessages(guildData, userId) {
-	const messages = guildData.previousMessages[userId];
-	let numMessagesDeleted = 0;
+async function deleteMessages(guildData, message, previousMessages) {
+	let messageIds = [];
 
-	for (const message of messages) {
-		if (message.deletable) {
-			await message.delete();
-			numMessagesDeleted += 1;
+	const fetches = previousMessages.map(async (spamMessage) => {
+		const fetchedMessage = await message.client.channels.cache
+			.get(message.channelId)
+			.messages.fetch(spamMessage.id);
+
+		if (fetchedMessage.deletable) {
+			messageIds.push(spamMessage.id);
 		}
-	}
+	});
 
-	guildData.previousMessages[userId] = [];
+	await Promise.all(fetches);
+
+	const channel = await message.client.channels.cache.get(message.channelId);
+	channel.bulkDelete(messageIds);
+
+	guildData.previousMessages[message.author.id] = [];
 	guildData.changed('previousMessages', true);
 	await guildData.save();
 
-	return numMessagesDeleted;
+	return messageIds.length;
 }
 
 module.exports = {
