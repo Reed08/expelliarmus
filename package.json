@@ -5,7 +5,7 @@
 	"scripts": {
 		"dev": "nodemon .",
 		"deploy": "node bot/deploy-commands.js",
-		"run": "node ."
+		"start": "node ."
 	},
 	"keywords": [],
 	"author": "",
